@@ -28,7 +28,7 @@ interface NodeOptions {
 
 - The `mode` option also filters the set of nodes.
 
-- When `voids` is false, [void Elements](./nodes/editor#schema-specific-instance-methods-to-override) are filtered out.
+- When `voids` is false, [void Elements](./nodes/editor.md#schema-specific-instance-methods-to-override) are filtered out.
 
 ## Static methods
 
@@ -38,13 +38,13 @@ Transforms that operate on nodes.
 
 #### `Transforms.insertFragment(editor: Editor, fragment: Node[], options?)`
 
-Insert of fragment of nodes at the specified location in the document. If no location is specified, insert at the current selection.
+Insert of fragment of nodes at the specified location or (if not defined) the current selection or (if not defined) the end of the document.
 
 Options: `{at?: Location, hanging?: boolean, voids?: boolean}`
 
 #### `Transforms.insertNodes(editor: Editor, nodes: Node | Node[], options?)`
 
-Atomically inserts `nodes` at the specified location in the document. If no location is specified, inserts at the current selection. If there is no selection, inserts at the end of the document.
+Atomically inserts `nodes` at the specified location or (if not defined) the current selection or (if not defined) the end of the document.
 
 Options supported: `NodeOptions & {hanging?: boolean, select?: boolean}`.
 
@@ -95,13 +95,15 @@ Options supported: `NodeOptions & {split?: boolean}`. For `options.mode`, `'all'
 
 Set properties of nodes at the specified location. If no location is specified, use the selection.
 
+if `props` contains `undefined` values, the node's corresponding property will also be set to `undefined` as opposed to ignored.
+
 Options supported: `NodeOptions & {hanging?: boolean, split?: boolean}`. For `options.mode`, `'all'` is also supported.
 
 #### `Transforms.unsetNodes(editor: Editor, props: string | string[], options?)`
 
 Unset properties of nodes at the specified location. If no location is specified, use the selection.
 
-Options supported: `NodeOptions & {split?: boolean}`. For `options.mode`, `'all'` is also supported.
+Options supported: `NodeOptions & {hanging?: boolean, split?: boolean}`. For `options.mode`, `'all'` is also supported.
 
 #### `Transforms.liftNodes(editor: Editor, options?)`
 
@@ -170,7 +172,7 @@ Options: `{at?: Location, distance?: number, unit?: 'character' | 'word' | 'line
 
 #### `Transforms.insertText(editor: Editor, text: string, options?)`
 
-Insert a string of text at the specified location in the document. If no location is specified, insert at the current selection.
+Insert a string of text at the specified location or (if not defined) the current selection or (if not defined) the end of the document.
 
 Options: `{at?: Location, voids?: boolean}`
 

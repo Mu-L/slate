@@ -1,5 +1,5 @@
 import { produce } from 'immer'
-import { Editor, Path, Range, Text } from '..'
+import { Editor, Path, Range, Scrubber, Text } from '..'
 import { Element, ElementEntry } from './element'
 
 /**
@@ -51,49 +51,160 @@ export interface NodeTextsOptions {
 }
 
 export interface NodeInterface {
+  /**
+   * Get the node at a specific path, asserting that it's an ancestor node.
+   */
   ancestor: (root: Node, path: Path) => Ancestor
+
+  /**
+   * Return a generator of all the ancestor nodes above a specific path.
+   *
+   * By default the order is top-down, from highest to lowest ancestor in
+   * the tree, but you can pass the `reverse: true` option to go bottom-up.
+   */
   ancestors: (
     root: Node,
     path: Path,
     options?: NodeAncestorsOptions
   ) => Generator<NodeEntry<Ancestor>, void, undefined>
+
+  /**
+   * Get the child of a node at a specific index.
+   */
   child: (root: Node, index: number) => Descendant
+
+  /**
+   * Iterate over the children of a node at a specific path.
+   */
   children: (
     root: Node,
     path: Path,
     options?: NodeChildrenOptions
   ) => Generator<NodeEntry<Descendant>, void, undefined>
+
+  /**
+   * Get an entry for the common ancesetor node of two paths.
+   */
   common: (root: Node, path: Path, another: Path) => NodeEntry
+
+  /**
+   * Get the node at a specific path, asserting that it's a descendant node.
+   */
   descendant: (root: Node, path: Path) => Descendant
+
+  /**
+   * Return a generator of all the descendant node entries inside a root node.
+   */
   descendants: (
     root: Node,
     options?: NodeDescendantsOptions
   ) => Generator<NodeEntry<Descendant>, void, undefined>
+
+  /**
+   * Return a generator of all the element nodes inside a root node. Each iteration
+   * will return an `ElementEntry` tuple consisting of `[Element, Path]`. If the
+   * root node is an element it will be included in the iteration as well.
+   */
   elements: (
     root: Node,
     options?: NodeElementsOptions
   ) => Generator<ElementEntry, void, undefined>
+
+  /**
+   * Extract props from a Node.
+   */
   extractProps: (node: Node) => NodeProps
+
+  /**
+   * Get the first node entry in a root node from a path.
+   */
   first: (root: Node, path: Path) => NodeEntry
+
+  /**
+   * Get the sliced fragment represented by a range inside a root node.
+   */
   fragment: (root: Node, range: Range) => Descendant[]
+
+  /**
+   * Get the descendant node referred to by a specific path. If the path is an
+   * empty array, it refers to the root node itself.
+   */
   get: (root: Node, path: Path) => Node
+
+  /**
+   * Similar to get, but returns undefined if the node does not exist.
+   */
+  getIf: (root: Node, path: Path) => Node | undefined
+
+  /**
+   * Check if a descendant node exists at a specific path.
+   */
   has: (root: Node, path: Path) => boolean
+
+  /**
+   * Check if a value implements the `Node` interface.
+   */
   isNode: (value: any) => value is Node
+
+  /**
+   * Check if a value is a list of `Node` objects.
+   */
   isNodeList: (value: any) => value is Node[]
+
+  /**
+   * Get the last node entry in a root node from a path.
+   */
   last: (root: Node, path: Path) => NodeEntry
+
+  /**
+   * Get the node at a specific path, ensuring it's a leaf text node.
+   */
   leaf: (root: Node, path: Path) => Text
+
+  /**
+   * Return a generator of the in a branch of the tree, from a specific path.
+   *
+   * By default the order is top-down, from highest to lowest node in the tree,
+   * but you can pass the `reverse: true` option to go bottom-up.
+   */
   levels: (
     root: Node,
     path: Path,
     options?: NodeLevelsOptions
   ) => Generator<NodeEntry, void, undefined>
+
+  /**
+   * Check if a node matches a set of props.
+   */
   matches: (node: Node, props: Partial<Node>) => boolean
+
+  /**
+   * Return a generator of all the node entries of a root node. Each entry is
+   * returned as a `[Node, Path]` tuple, with the path referring to the node's
+   * position inside the root node.
+   */
   nodes: (
     root: Node,
     options?: NodeNodesOptions
   ) => Generator<NodeEntry, void, undefined>
+
+  /**
+   * Get the parent of a node at a specific path.
+   */
   parent: (root: Node, path: Path) => Ancestor
+
+  /**
+   * Get the concatenated text string of a node's content.
+   *
+   * Note that this will not include spaces or line breaks between block nodes.
+   * It is not a user-facing string, but a string for performing offset-related
+   * computations for a node.
+   */
   string: (node: Node) => string
+
+  /**
+   * Return a generator of all leaf text nodes in a root node.
+   */
   texts: (
     root: Node,
     options?: NodeTextsOptions
@@ -102,29 +213,21 @@ export interface NodeInterface {
 
 const IS_NODE_LIST_CACHE = new WeakMap<any[], boolean>()
 
+// eslint-disable-next-line no-redeclare
 export const Node: NodeInterface = {
-  /**
-   * Get the node at a specific path, asserting that it's an ancestor node.
-   */
-
   ancestor(root: Node, path: Path): Ancestor {
     const node = Node.get(root, path)
 
     if (Text.isText(node)) {
       throw new Error(
-        `Cannot get the ancestor node at path [${path}] because it refers to a text node instead: ${node}`
+        `Cannot get the ancestor node at path [${path}] because it refers to a text node instead: ${Scrubber.stringify(
+          node
+        )}`
       )
     }
 
     return node
   },
-
-  /**
-   * Return a generator of all the ancestor nodes above a specific path.
-   *
-   * By default the order is top-down, from highest to lowest ancestor in
-   * the tree, but you can pass the `reverse: true` option to go bottom-up.
-   */
 
   *ancestors(
     root: Node,
@@ -138,14 +241,10 @@ export const Node: NodeInterface = {
     }
   },
 
-  /**
-   * Get the child of a node at a specific index.
-   */
-
   child(root: Node, index: number): Descendant {
     if (Text.isText(root)) {
       throw new Error(
-        `Cannot get the child of a text node: ${JSON.stringify(root)}`
+        `Cannot get the child of a text node: ${Scrubber.stringify(root)}`
       )
     }
 
@@ -153,7 +252,7 @@ export const Node: NodeInterface = {
 
     if (c == null) {
       throw new Error(
-        `Cannot get child at index \`${index}\` in node: ${JSON.stringify(
+        `Cannot get child at index \`${index}\` in node: ${Scrubber.stringify(
           root
         )}`
       )
@@ -161,10 +260,6 @@ export const Node: NodeInterface = {
 
     return c
   },
-
-  /**
-   * Iterate over the children of a node at a specific path.
-   */
 
   *children(
     root: Node,
@@ -184,35 +279,25 @@ export const Node: NodeInterface = {
     }
   },
 
-  /**
-   * Get an entry for the common ancesetor node of two paths.
-   */
-
   common(root: Node, path: Path, another: Path): NodeEntry {
     const p = Path.common(path, another)
     const n = Node.get(root, p)
     return [n, p]
   },
 
-  /**
-   * Get the node at a specific path, asserting that it's a descendant node.
-   */
-
   descendant(root: Node, path: Path): Descendant {
     const node = Node.get(root, path)
 
     if (Editor.isEditor(node)) {
       throw new Error(
-        `Cannot get the descendant node at path [${path}] because it refers to the root editor node instead: ${node}`
+        `Cannot get the descendant node at path [${path}] because it refers to the root editor node instead: ${Scrubber.stringify(
+          node
+        )}`
       )
     }
 
     return node
   },
-
-  /**
-   * Return a generator of all the descendant node entries inside a root node.
-   */
 
   *descendants(
     root: Node,
@@ -227,12 +312,6 @@ export const Node: NodeInterface = {
     }
   },
 
-  /**
-   * Return a generator of all the element nodes inside a root node. Each iteration
-   * will return an `ElementEntry` tuple consisting of `[Element, Path]`. If the
-   * root node is an element it will be included in the iteration as well.
-   */
-
   *elements(
     root: Node,
     options: NodeElementsOptions = {}
@@ -243,10 +322,6 @@ export const Node: NodeInterface = {
       }
     }
   },
-
-  /**
-   * Extract props from a Node.
-   */
 
   extractProps(node: Node): NodeProps {
     if (Element.isAncestor(node)) {
@@ -259,10 +334,6 @@ export const Node: NodeInterface = {
       return properties
     }
   },
-
-  /**
-   * Get the first node entry in a root node from a path.
-   */
 
   first(root: Node, path: Path): NodeEntry {
     const p = path.slice()
@@ -280,14 +351,10 @@ export const Node: NodeInterface = {
     return [n, p]
   },
 
-  /**
-   * Get the sliced fragment represented by a range inside a root node.
-   */
-
   fragment(root: Node, range: Range): Descendant[] {
     if (Text.isText(root)) {
       throw new Error(
-        `Cannot get a fragment starting from a root text node: ${JSON.stringify(
+        `Cannot get a fragment starting from a root text node: ${Scrubber.stringify(
           root
         )}`
       )
@@ -326,23 +393,26 @@ export const Node: NodeInterface = {
     return newRoot.children
   },
 
-  /**
-   * Get the descendant node referred to by a specific path. If the path is an
-   * empty array, it refers to the root node itself.
-   */
-
   get(root: Node, path: Path): Node {
+    const node = Node.getIf(root, path)
+    if (node === undefined) {
+      throw new Error(
+        `Cannot find a descendant at path [${path}] in node: ${Scrubber.stringify(
+          root
+        )}`
+      )
+    }
+    return node
+  },
+
+  getIf(root: Node, path: Path): Node | undefined {
     let node = root
 
     for (let i = 0; i < path.length; i++) {
       const p = path[i]
 
       if (Text.isText(node) || !node.children[p]) {
-        throw new Error(
-          `Cannot find a descendant at path [${path}] in node: ${JSON.stringify(
-            root
-          )}`
-        )
+        return
       }
 
       node = node.children[p]
@@ -350,10 +420,6 @@ export const Node: NodeInterface = {
 
     return node
   },
-
-  /**
-   * Check if a descendant node exists at a specific path.
-   */
 
   has(root: Node, path: Path): boolean {
     let node = root
@@ -371,19 +437,11 @@ export const Node: NodeInterface = {
     return true
   },
 
-  /**
-   * Check if a value implements the `Node` interface.
-   */
-
   isNode(value: any): value is Node {
     return (
       Text.isText(value) || Element.isElement(value) || Editor.isEditor(value)
     )
   },
-
-  /**
-   * Check if a value is a list of `Node` objects.
-   */
 
   isNodeList(value: any): value is Node[] {
     if (!Array.isArray(value)) {
@@ -397,10 +455,6 @@ export const Node: NodeInterface = {
     IS_NODE_LIST_CACHE.set(value, isNodeList)
     return isNodeList
   },
-
-  /**
-   * Get the last node entry in a root node from a path.
-   */
 
   last(root: Node, path: Path): NodeEntry {
     const p = path.slice()
@@ -419,28 +473,19 @@ export const Node: NodeInterface = {
     return [n, p]
   },
 
-  /**
-   * Get the node at a specific path, ensuring it's a leaf text node.
-   */
-
   leaf(root: Node, path: Path): Text {
     const node = Node.get(root, path)
 
     if (!Text.isText(node)) {
       throw new Error(
-        `Cannot get the leaf node at path [${path}] because it refers to a non-leaf node: ${node}`
+        `Cannot get the leaf node at path [${path}] because it refers to a non-leaf node: ${Scrubber.stringify(
+          node
+        )}`
       )
     }
 
     return node
   },
-
-  /**
-   * Return a generator of the in a branch of the tree, from a specific path.
-   *
-   * By default the order is top-down, from highest to lowest node in the tree,
-   * but you can pass the `reverse: true` option to go bottom-up.
-   */
 
   *levels(
     root: Node,
@@ -453,10 +498,6 @@ export const Node: NodeInterface = {
     }
   },
 
-  /**
-   * Check if a node matches a set of props.
-   */
-
   matches(node: Node, props: Partial<Node>): boolean {
     return (
       (Element.isElement(node) &&
@@ -467,12 +508,6 @@ export const Node: NodeInterface = {
         Text.matches(node, props))
     )
   },
-
-  /**
-   * Return a generator of all the node entries of a root node. Each entry is
-   * returned as a `[Node, Path]` tuple, with the path referring to the node's
-   * position inside the root node.
-   */
 
   *nodes(
     root: Node,
@@ -543,10 +578,6 @@ export const Node: NodeInterface = {
     }
   },
 
-  /**
-   * Get the parent of a node at a specific path.
-   */
-
   parent(root: Node, path: Path): Ancestor {
     const parentPath = Path.parent(path)
     const p = Node.get(root, parentPath)
@@ -560,14 +591,6 @@ export const Node: NodeInterface = {
     return p
   },
 
-  /**
-   * Get the concatenated text string of a node's content.
-   *
-   * Note that this will not include spaces or line breaks between block nodes.
-   * It is not a user-facing string, but a string for performing offset-related
-   * computations for a node.
-   */
-
   string(node: Node): string {
     if (Text.isText(node)) {
       return node.text
@@ -575,10 +598,6 @@ export const Node: NodeInterface = {
       return node.children.map(Node.string).join('')
     }
   },
-
-  /**
-   * Return a generator of all leaf text nodes in a root node.
-   */
 
   *texts(
     root: Node,

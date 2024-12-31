@@ -1,24 +1,32 @@
 import React from 'react'
-import { Editor, Range, Element, Ancestor, Descendant } from 'slate'
-
-import ElementComponent from '../components/element'
-import TextComponent from '../components/text'
-import { ReactEditor } from '..'
-import { useSlateStatic } from './use-slate-static'
-import { NODE_TO_INDEX, NODE_TO_PARENT } from '../utils/weak-maps'
+import {
+  Ancestor,
+  Descendant,
+  Editor,
+  Element,
+  Range,
+  DecoratedRange,
+} from 'slate'
 import {
   RenderElementProps,
   RenderLeafProps,
   RenderPlaceholderProps,
 } from '../components/editable'
+
+import ElementComponent from '../components/element'
+import TextComponent from '../components/text'
+import { ReactEditor } from '../plugin/react-editor'
+import { IS_NODE_MAP_DIRTY, NODE_TO_INDEX, NODE_TO_PARENT } from 'slate-dom'
+import { useDecorate } from './use-decorate'
 import { SelectedContext } from './use-selected'
+import { useSlateStatic } from './use-slate-static'
 
 /**
  * Children.
  */
 
 const useChildren = (props: {
-  decorations: Range[]
+  decorations: DecoratedRange[]
   node: Ancestor
   renderElement?: (props: RenderElementProps) => JSX.Element
   renderPlaceholder: (props: RenderPlaceholderProps) => JSX.Element
@@ -33,7 +41,9 @@ const useChildren = (props: {
     renderLeaf,
     selection,
   } = props
+  const decorate = useDecorate()
   const editor = useSlateStatic()
+  IS_NODE_MAP_DIRTY.set(editor as ReactEditor, false)
   const path = ReactEditor.findPath(editor, node)
   const children = []
   const isLeafBlock =
@@ -47,12 +57,15 @@ const useChildren = (props: {
     const key = ReactEditor.findKey(editor, n)
     const range = Editor.range(editor, p)
     const sel = selection && Range.intersection(range, selection)
+    const ds = decorate([n, p])
 
-    const ds = decorations.reduce<Range[]>((acc, dec) => {
-      const intersection = Range.intersection(dec, range)
-      if (intersection) acc.push(intersection)
-      return acc
-    }, [])
+    for (const dec of decorations) {
+      const d = Range.intersection(dec, range)
+
+      if (d) {
+        ds.push(d)
+      }
+    }
 
     if (Element.isElement(n)) {
       children.push(

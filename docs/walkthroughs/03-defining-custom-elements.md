@@ -15,10 +15,10 @@ const initialValue = [
 ]
 
 const App = () => {
-  const editor = useMemo(() => withReact(createEditor()), [])
+  const [editor] = useState(() => withReact(createEditor()))
 
   return (
-    <Slate editor={editor} value={initialValue}>
+    <Slate editor={editor} initialValue={initialValue}>
       <Editable
         onKeyDown={event => {
           if (event.key === '&') {
@@ -74,7 +74,7 @@ const initialValue = [
 ]
 
 const App = () => {
-  const editor = useMemo(() => withReact(createEditor()), [])
+  const [editor] = useState(() => withReact(createEditor()))
 
   // Define a rendering function based on the element passed to `props`. We use
   // `useCallback` here to memoize the function for subsequent renders.
@@ -88,7 +88,7 @@ const App = () => {
   }, [])
 
   return (
-    <Slate editor={editor} value={initialValue}>
+    <Slate editor={editor} initialValue={initialValue}>
       <Editable
         // Pass in the `renderElement` function.
         renderElement={renderElement}
@@ -116,11 +116,11 @@ const DefaultElement = props => {
 }
 ```
 
-Okay, but now we'll need a way for the user to actually turn a block into a code block. So let's change our `onKeyDown` function to add a ``Ctrl-``` shortcut that does just that:
+Okay, but now we'll need a way for the user to actually turn a block into a code block. So let's change our `onKeyDown` function to add a `` Ctrl-` `` shortcut that does just that:
 
 ```jsx
 // Import the `Editor` and `Transforms` helpers from Slate.
-import { Editor, Transforms } from 'slate'
+import { Editor, Transforms, Element } from 'slate'
 
 const initialValue = [
   {
@@ -130,7 +130,7 @@ const initialValue = [
 ]
 
 const App = () => {
-  const editor = useMemo(() => withReact(createEditor()), [])
+  const [editor] = useState(() => withReact(createEditor()))
 
   const renderElement = useCallback(props => {
     switch (props.element.type) {
@@ -142,7 +142,7 @@ const App = () => {
   }, [])
 
   return (
-    <Slate editor={editor} value={initialValue}>
+    <Slate editor={editor} initialValue={initialValue}>
       <Editable
         renderElement={renderElement}
         onKeyDown={event => {
@@ -153,7 +153,7 @@ const App = () => {
             Transforms.setNodes(
               editor,
               { type: 'code' },
-              { match: n => Editor.isBlock(editor, n) }
+              { match: n => Element.isElement(n) && Editor.isBlock(editor, n) }
             )
           }
         }}
@@ -175,9 +175,9 @@ const DefaultElement = props => {
 }
 ```
 
-Now, if you press ``Ctrl-``` the block your cursor is in should turn into a code block! Magic!
+Now, if you press `` Ctrl-` `` the block your cursor is in should turn into a code block! Magic!
 
-But we forgot one thing. When you hit ``Ctrl-``` again, it should change the code block back into a paragraph. To do that, we'll need to add a bit of logic to change the type we set based on whether any of the currently selected blocks are already a code block:
+But we forgot one thing. When you hit `` Ctrl-` `` again, it should change the code block back into a paragraph. To do that, we'll need to add a bit of logic to change the type we set based on whether any of the currently selected blocks are already a code block:
 
 ```jsx
 const initialValue = [
@@ -188,7 +188,7 @@ const initialValue = [
 ]
 
 const App = () => {
-  const editor = useMemo(() => withReact(createEditor()), [])
+  const [editor] = useState(() => withReact(createEditor()))
 
   const renderElement = useCallback(props => {
     switch (props.element.type) {
@@ -200,7 +200,7 @@ const App = () => {
   }, [])
 
   return (
-    <Slate editor={editor} value={initialValue}>
+    <Slate editor={editor} initialValue={initialValue}>
       <Editable
         renderElement={renderElement}
         onKeyDown={event => {
@@ -214,7 +214,7 @@ const App = () => {
             Transforms.setNodes(
               editor,
               { type: match ? 'paragraph' : 'code' },
-              { match: n => Editor.isBlock(editor, n) }
+              { match: n => Element.isElement(n) && Editor.isBlock(editor, n) }
             )
           }
         }}
@@ -224,4 +224,4 @@ const App = () => {
 }
 ```
 
-And there you have it! If you press ``Ctrl-``` while inside a code block, it should turn back into a paragraph!
+And there you have it! If you press `` Ctrl-` `` while inside a code block, it should turn back into a paragraph!

@@ -15,11 +15,14 @@ export const input = {
   insertFragment() {},
   insertNode() {},
   insertText() {},
+  isElementReadOnly() {},
   isInline() {},
+  isSelectable() {},
   isVoid() {},
   normalizeNode() {},
   onChange() {},
   removeMark() {},
+  getDirtyPaths() {},
 }
 export const test = value => {
   return Element.isElement(value)

@@ -1,41 +1,31 @@
-import React, { useRef } from 'react'
-import { Range, Element, Text as SlateText } from 'slate'
-
-import Leaf from './leaf'
+import React, { useCallback, useRef } from 'react'
+import { Element, DecoratedRange, Text as SlateText } from 'slate'
 import { ReactEditor, useSlateStatic } from '..'
-import { RenderLeafProps, RenderPlaceholderProps } from './editable'
-import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect'
+import { isTextDecorationsEqual } from 'slate-dom'
 import {
-  NODE_TO_ELEMENT,
-  ELEMENT_TO_NODE,
   EDITOR_TO_KEY_TO_ELEMENT,
-} from '../utils/weak-maps'
-import { isDecoratorRangeListEqual } from '../utils/range-list'
-import { useContentKey } from '../hooks/use-content-key'
-import { IS_ANDROID } from '../utils/environment'
+  ELEMENT_TO_NODE,
+  NODE_TO_ELEMENT,
+} from 'slate-dom'
+import { RenderLeafProps, RenderPlaceholderProps } from './editable'
+import Leaf from './leaf'
 
 /**
  * Text.
  */
 
 const Text = (props: {
-  decorations: Range[]
+  decorations: DecoratedRange[]
   isLast: boolean
   parent: Element
   renderPlaceholder: (props: RenderPlaceholderProps) => JSX.Element
   renderLeaf?: (props: RenderLeafProps) => JSX.Element
   text: SlateText
 }) => {
-  const {
-    decorations,
-    isLast,
-    parent,
-    renderPlaceholder,
-    renderLeaf,
-    text,
-  } = props
+  const { decorations, isLast, parent, renderPlaceholder, renderLeaf, text } =
+    props
   const editor = useSlateStatic()
-  const ref = useRef<HTMLSpanElement>(null)
+  const ref = useRef<HTMLSpanElement | null>(null)
   const leaves = SlateText.decorations(text, decorations)
   const key = ReactEditor.findKey(editor, text)
   const children = []
@@ -57,22 +47,26 @@ const Text = (props: {
   }
 
   // Update element-related weak maps with the DOM element ref.
-  useIsomorphicLayoutEffect(() => {
-    const KEY_TO_ELEMENT = EDITOR_TO_KEY_TO_ELEMENT.get(editor)
-    if (ref.current) {
-      KEY_TO_ELEMENT?.set(key, ref.current)
-      NODE_TO_ELEMENT.set(text, ref.current)
-      ELEMENT_TO_NODE.set(ref.current, text)
-    } else {
-      KEY_TO_ELEMENT?.delete(key)
-      NODE_TO_ELEMENT.delete(text)
-    }
-  })
-
-  const contentKey = IS_ANDROID ? useContentKey(text) : undefined
-
+  const callbackRef = useCallback(
+    (span: HTMLSpanElement | null) => {
+      const KEY_TO_ELEMENT = EDITOR_TO_KEY_TO_ELEMENT.get(editor)
+      if (span) {
+        KEY_TO_ELEMENT?.set(key, span)
+        NODE_TO_ELEMENT.set(text, span)
+        ELEMENT_TO_NODE.set(span, text)
+      } else {
+        KEY_TO_ELEMENT?.delete(key)
+        NODE_TO_ELEMENT.delete(text)
+        if (ref.current) {
+          ELEMENT_TO_NODE.delete(ref.current)
+        }
+      }
+      ref.current = span
+    },
+    [ref, editor, key, text]
+  )
   return (
-    <span data-slate-node="text" ref={ref} key={contentKey}>
+    <span data-slate-node="text" ref={callbackRef}>
       {children}
     </span>
   )
@@ -83,8 +77,9 @@ const MemoizedText = React.memo(Text, (prev, next) => {
     next.parent === prev.parent &&
     next.isLast === prev.isLast &&
     next.renderLeaf === prev.renderLeaf &&
+    next.renderPlaceholder === prev.renderPlaceholder &&
     next.text === prev.text &&
-    isDecoratorRangeListEqual(next.decorations, prev.decorations)
+    isTextDecorationsEqual(next.decorations, prev.decorations)
   )
 })
 

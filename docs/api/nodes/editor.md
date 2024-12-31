@@ -12,8 +12,9 @@ interface Editor {
   // Schema-specific node behaviors.
   isInline: (element: Element) => boolean
   isVoid: (element: Element) => boolean
+  markableVoid: (element: Element) => boolean
   normalizeNode: (entry: NodeEntry) => void
-  onChange: () => void
+  onChange: (options?: { operation?: Operation }) => void
 
   // Overrideable core actions.
   addMark: (key: string, value: any) => void
@@ -39,7 +40,7 @@ interface Editor {
 - [Instance methods](editor.md#instance-methods)
   - [Schema-specific methods to override](editor.md#schema-specific-instance-methods-to-override)
   - [Element Type Methods](editor.md/#element-type-methods)
-  - [Normalize Method](editor.md/#normalize-method)
+  - [Normalize Methods](editor.md/#normalize-methods)
   - [Callback Method](editor.md/#callback-method)
   - [Mark Methods](editor.md/#mark-methods)
   - [getFragment Method](editor.md/#getfragment-method)
@@ -126,7 +127,7 @@ Get the marks that would be added to text at the current selection.
 
 Get the matching node in the branch of the document after a location.
 
-Note: If you are looking for the next Point, and not the next Node, you are probably looking for the method `Editor.after`
+Note: To find the next Point, and not the next Node, use the `Editor.after` method
 
 Options: `{at?: Location, match?: NodeMatch, mode?: 'all' | 'highest' | 'lowest', voids?: boolean}`
 
@@ -164,7 +165,7 @@ Options: `{depth?: number, edge?: 'start' | 'end'}`
 
 #### `Editor.point(editor: Editor, at: Location, options?) => Point`
 
-Get the start or end point of a location.
+Get the `start` or `end` (default is `start`) point of a location.
 
 Options: `{edge?: 'start' | 'end'}`
 
@@ -174,7 +175,7 @@ Iterate through all of the positions in the document where a `Point` can be plac
 
 Read `options.unit` to see how this method iterates through positions.
 
-Note: By default void nodes are treated as a single point and iteration will not happen inside their content unless you pass in true for the voids option, then iteration will occur.
+Note: By default void nodes are treated as a single point and iteration will not happen inside their content unless the voids option is set, then iteration will occur.
 
 Options:
 
@@ -191,7 +192,7 @@ Options:
 
 Get the matching node in the branch of the document before a location.
 
-Note: If you are looking for the previous Point, and not the previous Node, you are probably looking for the method `Editor.before`
+Note: To find the previous Point, and not the previous Node, use the `Editor.before` method
 
 Options: `{at?: Location, match?: NodeMatch, mode?: 'all' | 'highest' | 'lowest', voids?: boolean}`
 
@@ -207,7 +208,7 @@ Get the start point of a location.
 
 Get the text string content of a location.
 
-Note: by default the text of void nodes is considered to be an empty string, regardless of content, unless you pass in true for the voids option
+Note: by default the text of void nodes is considered to be an empty string, regardless of content, unless the voids option is set.
 
 Options: : `{voids?: boolean}`
 
@@ -221,7 +222,7 @@ Options: `{at?: Location, mode?: 'highest' | 'lowest', voids?: boolean}`
 
 #### `Editor.addMark(editor: Editor, key: string, value: any) => void`
 
-Add a custom property to the leaf text nodes in the current selection.
+Add a custom property to the leaf text nodes and any nodes that `editor.markableVoid()` allows in the current selection.
 
 If the selection is currently collapsed, the marks will be added to the `editor.marks` property instead, and applied when text is inserted next.
 
@@ -245,27 +246,27 @@ Delete the content in the current selection.
 
 Insert a block break at the current selection.
 
-#### `Editor.insertFragment(editor: Editor, fragment: Node[]) => void`
+#### `Editor.insertFragment(editor: Editor, fragment: Node[], options?) => void`
 
-Inserts a fragment _at the current selection_.
+Inserts a fragment at the specified location or (if not defined) the current selection or (if not defined) the end of the document.
 
-If the selection is currently expanded, it will be deleted first. To atomically insert nodes (including at the very beginning or end), use [Transforms.insertNodes](../transforms.md#transformsinsertnodeseditor-editor-nodes-node--node-options).
+Options: `{at?: Location, hanging?: boolean, voids?: boolean}`
 
-#### `Editor.insertNode(editor: Editor, node: Node) => void`
+#### `Editor.insertNode(editor: Editor, node: Node, options?) => void`
 
-Inserts a node _at the current selection_.
+Atomically insert `node` at the specified location or (if not defined) the current selection or (if not defined) the end of the document.
 
-If the selection is currently expanded, it will be deleted first. To atomically insert a node (including at the very beginning or end), use [Transforms.insertNodes](../transforms.md#transformsinsertnodeseditor-editor-nodes-node--node-options).
+Options supported: `NodeOptions & {hanging?: boolean, select?: boolean}`.
 
-#### `Editor.insertText(editor: Editor, text: string) => void`
+#### `Editor.insertText(editor: Editor, text: string, options?) => void`
 
-Inserts text _at the current selection_.
+Insert a string of text at the specified location or (if not defined) the current selection or (if not defined) the end of the document.
 
-If the selection is currently expanded, it will be deleted first.
+Options: `{at?: Location, voids?: boolean}`
 
 #### `Editor.removeMark(editor: Editor, key: string) => void`
 
-Remove a custom property from all of the leaf text nodes in the current selection.
+Remove a custom property from all of the leaf text nodes within non-void nodes or void nodes that `editor.markableVoid()` allows in the current selection.
 
 If the selection is currently collapsed, the removal will be stored on `editor.marks` and applied to the text inserted next.
 
@@ -340,12 +341,12 @@ Check if a value is a void `Element` object.
 
 Normalize any dirty objects in the editor.
 
-Options: `{force?: boolean}`
+Options: `{force?: boolean; operation?: Operation}`
 
 #### `Editor.withoutNormalizing(editor: Editor, fn: () => void) => void`
 
 Call a function, deferring normalization until after it completes.
-See [Normalization - Implications for Other Code](./11-normalizing.md#implications-for-other-code);
+See [Normalization - Implications for Other Code](../../concepts/11-normalizing.md#implications-for-other-code);
 
 ### Ref Methods
 
@@ -409,27 +410,37 @@ Check if a value is an inline `Element` object.
 
 Check if a value is a void `Element` object.
 
-### Normalize method
+### Normalize methods
 
-#### `normalizeNode(entry: NodeEntry) => void`
+#### `normalizeNode(entry: NodeEntry, { operation }) => void`
 
 [Normalize](../../concepts/11-normalizing.md) a Node according to the schema.
 
+#### `shouldNormalize: (options) => boolean`
+
+Override this method to prevent normalizing the editor.
+
+Options: `{ dirtyPaths: Path[]; initialDirtyPathsLength: number; iteration: number; operation?: Operation }`
+
 ### Callback method
 
-#### `onChange() => void`
+#### `onChange(options?: { operation?: Operation }) => void`
 
 Called when there is a change in the editor.
 
 ### Mark methods
 
+#### `markableVoid: (element: Element) => boolean`
+
+Tells which void nodes accept Marks. Slate's default implementation returns `false`, but if some void elements support formatting, override this function to include them.
+
 #### `addMark(key: string, value: any) => void`
 
-Add a custom property to the leaf text nodes in the current selection. If the selection is currently collapsed, the marks will be added to the `editor.marks` property instead, and applied when text is inserted next.
+Add a custom property to the leaf text nodes within non-void nodes or void nodes that `editor.markableVoid()` allows in the current selection. If the selection is currently collapsed, the marks will be added to the `editor.marks` property instead, and applied when text is inserted next.
 
 #### `removeMark(key: string) => void`
 
-Remove a custom property from the leaf text nodes in the current selection.
+Remove a custom property from the leaf text nodes within non-void nodes or void nodes that `editor.markableVoid()` allows in the current selection.
 
 ### getFragment method
 
@@ -439,7 +450,7 @@ Returns the fragment at the current selection. Used when cutting or copying, as 
 
 ### Delete methods
 
-When a user presses backspace or delete, it invokes the method based on the selection. For example, if the selection is expanded over some text and the user presses the backspace key, `deleteFragment` will be called but if the selecttion is collapsed, `deleteBackward` will be called.
+When a user presses backspace or delete, it invokes the method based on the selection. For example, if the selection is expanded over some text and the user presses the backspace key, `deleteFragment` will be called, but if the selection is collapsed, `deleteBackward` will be called.
 
 #### `deleteBackward(options?: {unit?: 'character' | 'word' | 'line' | 'block'}) => void`
 
